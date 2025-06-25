@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hand Gesture Recognition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Playfair Display', 'Times New Roman', Times, serif;
+            background: linear-gradient(120deg, #e0eafc 0%, #cfdef3 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .navbar-classic {
+            background: rgba(56, 142, 60, 0.92);
+            color: #fff;
+            font-family: 'Playfair Display', serif;
+            font-size: 2.2em;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-align: center;
+            padding: 1.2em 0 0.7em 0;
+            box-shadow: 0 2px 16px #388e3c22;
+            border-bottom-left-radius: 30px;
+            border-bottom-right-radius: 30px;
+        }
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 3em;
+            margin: 2.5em auto 2em auto;
+            max-width: 1100px;
+            background: rgba(255,255,255,0.93);
+            border-radius: 24px;
+            box-shadow: 0 8px 32px #388e3c22, 0 2px 8px #388e3c11;
+            padding: 2.5em 2em 2em 2em;
+        }
+        .video-canvas-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5em;
+        }
+        video, canvas {
+            width: 340px;
+            height: 420px;
+            max-width: 90vw;
+            background: #f9fbe7;
+            border: 3px solid #388e3c;
+            border-radius: 18px;
+            box-shadow: 0 4px 24px #388e3c22;
+            margin-bottom: 0.5em;
+        }
+        #result {
+            margin-top: 18px;
+            font-size: 1.4em;
+            font-family: 'Roboto', serif;
+            font-weight: 500;
+            color: #388e3c;
+            background: #fffde7;
+            border-radius: 10px;
+            padding: 0.7em 1.5em;
+            box-shadow: 0 1px 8px #388e3c11;
+            letter-spacing: 1px;
+        }
+        #owner {
+            margin-top: 30px;
+            color: #388e3c;
+            font-size: 1.2em;
+            font-family: 'Playfair Display', serif;
+            font-weight: 700;
+            background: #fffde7;
+            padding: 12px 32px;
+            border-radius: 16px;
+            box-shadow: 0 1px 8px #388e3c11;
+            display: inline-block;
+            letter-spacing: 1px;
+        }
+        p {
+            color: #333;
+            font-size: 1.1em;
+            font-family: 'Roboto', serif;
+        }
+        .classic-footer {
+            width: 100vw;
+            background: rgba(56, 142, 60, 0.92);
+            color: #fff;
+            text-align: center;
+            font-size: 1.1em;
+            font-family: 'Playfair Display', serif;
+            font-weight: 500;
+            padding: 18px 0 14px 0;
+            position: fixed;
+            left: 0; bottom: 0;
+            z-index: 10;
+            border-top: 2px solid #81c784;
+            box-shadow: 0 -2px 8px #388e3c22;
+            letter-spacing: 1px;
+            border-top-left-radius: 30px;
+            border-top-right-radius: 30px;
+        }
+        @media screen and (max-width: 900px) {
+            .container {
+                flex-direction: column;
+                align-items: center;
+                padding: 1.2em 0.5em;
+            }
+            .video-canvas-block {
+                flex-direction: row;
+                gap: 1em;
+            }
+            video, canvas {
+                width: 44vw;
+                height: 240px;
+                min-width: 160px;
+                max-width: 95vw;
+            }
+        }
+        @media screen and (max-width: 700px) {
+            .container {
+                flex-direction: column;
+                align-items: center;
+                padding: 1em 0.2em;
+            }
+            .video-canvas-block {
+                flex-direction: column;
+                gap: 1em;
+            }
+            video, canvas {
+                width: 90vw;
+                height: 220px;
+                min-width: 120px;
+            }
+            #owner {
+                font-size: 1em;
+                padding: 10px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar-classic">
+        Hand Gesture Recognition
+    </div>
+    <div class="container">
+        <div class="video-canvas-block">
+            <video id="video" autoplay playsinline></video>
+            <span style="font-size:1em;color:#888;">Live Camera</span>
+        </div>
+        <div class="video-canvas-block">
+            <canvas id="canvas"></canvas>
+            <span style="font-size:1em;color:#888;">Hand Landmarks</span>
+        </div>
+    </div>
+    <p id="result">Fingers Open: 0 | Movement: None</p>
+    <div id="owner">Welcome</div>
+    <div class="classic-footer">
+        &copy; 2024 Hand Gesture Recognition. All rights reserved.
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script>
+        let video = document.getElementById('video'), 
+            canvas = document.getElementById('canvas'), 
+            ctx = canvas.getContext('2d'), 
+            resultText = document.getElementById('result'), 
+            camera = null, 
+            prevYPos = null, 
+            prevXPos = null,
+            movementThreshold = 30, 
+            openFingers = 0;  // To count open fingers
+
+        const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+
+        hands.onResults((results) => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            let movementStatus = "None";
+            openFingers = 0; // Reset the number of open fingers count
+
+            if (results.multiHandLandmarks) {
+                results.multiHandLandmarks.forEach((landmarks) => {
+                    drawLandmarks(ctx, landmarks, { color: 'red', lineWidth: 2 });
+
+                    // Counting open fingers
+                    openFingers = countOpenFingers(landmarks);
+
+                    // Detect Hand Movement (Up/Down/Left/Right)
+                    const wristY = landmarks[0][1];  // Wrist's Y-coordinate
+                    const wristX = landmarks[0][0];  // Wrist's X-coordinate
+                    movementStatus = detectMovement(wristY, wristX);
+                    prevYPos = wristY;  // Update previous Y position for the next frame
+                    prevXPos = wristX;  // Update previous X position for the next frame
+                });
+            }
+
+            // Display the results
+            resultText.innerText = `Fingers Open: ${openFingers} | Movement: ${movementStatus}`;
+        });
+
+        function countOpenFingers(landmarks) {
+            const fingerTips = [4, 8, 12, 16, 20]; // Thumb, Index, Middle, Ring, Pinky tips
+            const fingerJoints = [2, 6, 10, 14, 18]; // Corresponding lower joints
+
+            let openFingersCount = 0;
+            for (let i = 0; i < 5; i++) {
+                if (landmarks[fingerTips[i]].y < landmarks[fingerJoints[i]].y) {
+                    openFingersCount++;
+                }
+            }
+            return openFingersCount;
+        }
+
+        function detectMovement(currentY, currentX) {
+            if (prevYPos === null || prevXPos === null) return "None"; // Skip the first frame
+
+            // Check wrist's Y-coordinate for up/down movement
+            if (currentY < prevYPos - movementThreshold) {
+                return "Hand Moving Up!";
+            } else if (currentY > prevYPos + movementThreshold) {
+                return "Hand Moving Down!";
+            }
+
+            // Check wrist's X-coordinate for left/right movement
+            if (currentX < prevXPos - movementThreshold) {
+                return "Hand Moving Left!";
+            } else if (currentX > prevXPos + movementThreshold) {
+                return "Hand Moving Right!";
+            }
+
+            return "No Significant Movement";
+        }
+
+        async function startCamera() {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            camera = new Camera(video, { onFrame: async () => await hands.send({ image: video }) });
+            camera.start();
+        }
+
+        startCamera();
+    </script>
+</body>
+</html>
